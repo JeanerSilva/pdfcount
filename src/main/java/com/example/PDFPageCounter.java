@@ -13,6 +13,7 @@ public class PDFPageCounter {
 
   public static Double paginas = 0.0;
   public static Integer arquivosTotais = 0;
+  private static File selectedDirectory = null;
 
   public static void main(String[] args) {
     SwingUtilities.invokeLater(() -> {
@@ -25,11 +26,17 @@ public class PDFPageCounter {
   }
 
   private static void createAndShowGUI() throws URISyntaxException {
-    JFrame frame = new JFrame("PDF Page Counter");
+    JFrame frame = new JFrame("Contador de Páginas PDF");
     frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
     frame.setSize(new Dimension(1200, 600));
 
-    JTextArea textArea = new JTextArea("");
+    JLayeredPane layeredPane = new JLayeredPane();
+    layeredPane.setPreferredSize(new Dimension(200, 400));
+
+    JPanel panel = new JPanel(new BorderLayout());
+    JTextArea textArea = new JTextArea();
+    panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
+
     textArea.setEditable(true);
     JScrollPane scrollPane = new JScrollPane(textArea);
     scrollPane.setVerticalScrollBarPolicy(
@@ -38,35 +45,84 @@ public class PDFPageCounter {
 
     textArea.setFont(new Font("Arial", Font.PLAIN, 12));
     textArea.setBounds(30, 30, 1170, 570);
-    frame.add(scrollPane);
+    frame.setLocationRelativeTo(null);
+    panel.add(scrollPane);
 
-    String jarPath =
-      PDFPageCounter.class.getProtectionDomain()
-        .getCodeSource()
-        .getLocation()
-        .toURI()
-        .getPath();
-    File jarFile = new File(jarPath);
-    String jarDir = jarFile.getParent();
-    frame.setVisible(true);
-
-    SwingUtilities.invokeLater(() ->
-      textArea.append(
-        "\nProcurando arquivos no diretorio " + jarDir + "...\n\n\n"
-      )
+    JSplitPane splitPane = new JSplitPane(
+      JSplitPane.HORIZONTAL_SPLIT,
+      layeredPane,
+      panel
     );
+    frame.add(splitPane);
 
-    new Thread(() -> {
-      procurarePlotarArquivos(textArea, jarDir);
-    })
-      .start();
+    JButton buttonSelecionaDiretorio = new JButton("Selecionar Diretório");
+    JButton buttonProcurar = new JButton("Contar páginas");
+    JButton buttonLimpar = new JButton("Limpar");
+
+    buttonSelecionaDiretorio.setBounds(10, 50, 150, 50); // x, y, largura, altura
+    buttonProcurar.setBounds(10, 110, 150, 50); // x, y, largura, altura
+    buttonLimpar.setBounds(10, 170, 150, 50 );
+   
+
+    layeredPane.add(buttonSelecionaDiretorio, JLayeredPane.DEFAULT_LAYER);
+    layeredPane.add(buttonProcurar, JLayeredPane.PALETTE_LAYER);
+    layeredPane.add(buttonLimpar, JLayeredPane.PALETTE_LAYER);
+    buttonProcurar.setEnabled(false);
+
+    buttonSelecionaDiretorio.addActionListener(e -> {
+      selectedDirectory = selecionarDiretorio(frame);
+      if (selectedDirectory != null) {
+        buttonProcurar.setEnabled(true); // Habilita o botão de ação
+        buttonLimpar.setEnabled(true);
+    } else {
+         buttonProcurar.setEnabled(false);
+         buttonLimpar.setEnabled(false);
+    }
+    });
+
+    buttonProcurar.addActionListener(e -> {
+      new Thread(() -> {
+        SwingUtilities.invokeLater(() ->
+          textArea.append(
+            "\nProcurando arquivos no diretorio " +
+            selectedDirectory.getAbsolutePath() +
+            "...\n\n\n"
+          )
+        );
+      })
+        .start();
+      new Thread(() -> {
+         procurarEPlotarArquivos(textArea);
+      })
+        .start();
+    });
+
+    buttonLimpar.addActionListener(e -> {
+        textArea.setText("");
+        selectedDirectory = null;
+        buttonProcurar.setEnabled(false);
+        buttonLimpar.setEnabled(false);
+    });
+
+    frame.setVisible(true);
   }
 
-  private static void procurarePlotarArquivos(
-    JTextArea textArea,
-    String jarDir
+  private static File selecionarDiretorio(JFrame frame) {
+    JFileChooser fileChooser = new JFileChooser();
+    fileChooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+
+    int option = fileChooser.showOpenDialog(frame);
+    if (option == JFileChooser.APPROVE_OPTION) {
+      return fileChooser.getSelectedFile();
+    }
+    return null;
+  }
+
+  private static void procurarEPlotarArquivos(
+    JTextArea textArea
   ) {
-    File rootFolder = new File(jarDir);
+    System.out.println("iniciando busca em " + selectedDirectory.getAbsolutePath());
+    File rootFolder = new File(selectedDirectory.getAbsolutePath());
     processFolder(rootFolder, textArea);
     SwingUtilities.invokeLater(() ->
       textArea.append("\n\nTotal de arquivos " + arquivosTotais + "\n")
@@ -88,12 +144,12 @@ public class PDFPageCounter {
 
   private static void processFolder(File folder, JTextArea textArea) {
     File[] listOfFiles = folder.listFiles();
-
     if (listOfFiles != null) {
       for (File file : listOfFiles) {
         if (file.isFile() && file.getName().endsWith(".pdf")) {
           processPDF(file, textArea);
         } else if (file.isDirectory()) {
+          System.out.println("Pasta " + file.getName() + "\n\n");
           SwingUtilities.invokeLater(() ->
             textArea.append("\n\n Pasta " + file.getName() + "\n\n")
           );
@@ -108,11 +164,12 @@ public class PDFPageCounter {
       int pageCount = document.getNumberOfPages();
       paginas += pageCount;
       arquivosTotais++;
-      SwingUtilities.invokeLater(() ->
+      SwingUtilities.invokeLater(() -> {
         textArea.append(
           file.getAbsolutePath() + " tem " + pageCount + " paginas.\n"
-        )
-      );
+        );
+        System.out.println( file.getAbsolutePath() + " tem " + pageCount + " paginas.\n");
+    });
     } catch (IOException e) {
       e.printStackTrace();
     }
