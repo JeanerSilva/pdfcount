@@ -9,12 +9,16 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 
 public class PDFPageCounter {
 
   public static Double paginas = 0.0;
   public static Integer arquivosTotais = 0;
+  public static Integer totalDeSemanasInt = 13;
   private static File selectedDirectory = null;
   private static int diasPorSemana = 7;
   private static List<PDFDeEstudo> pdfsDeEstudo = new ArrayList<>();
@@ -79,13 +83,22 @@ public class PDFPageCounter {
       numberComboBox.setSelectedItem(diasPorSemana);
     }
 
+    JLabel totaldeSemanaLabel = new JLabel("Total de semanas");
+    totaldeSemanaLabel.setBounds(30, 290, 200, 20);
+    JTextField totalDeSemanas = new JTextField(20);
+    totalDeSemanas.setBounds(30, 320, 50, 20);
+
+
     layeredPane.add(buttonSelecionaDiretorio, JLayeredPane.DEFAULT_LAYER);
     layeredPane.add(buttonProcurar, JLayeredPane.PALETTE_LAYER);
     layeredPane.add(buttonLimpar, JLayeredPane.PALETTE_LAYER);
     layeredPane.add(diasPorSemanaLabel);
     layeredPane.add(numberComboBox);
+    layeredPane.add(totaldeSemanaLabel);
+    layeredPane.add(totalDeSemanas);
     buttonProcurar.setEnabled(false);
     buttonLimpar.setEnabled(false);
+    totalDeSemanas.setText(String.valueOf(totalDeSemanasInt));
 
     buttonSelecionaDiretorio.addActionListener(e -> {
       selectedDirectory = selecionarDiretorio(frame);
@@ -100,7 +113,8 @@ public class PDFPageCounter {
     });
 
     buttonProcurar.addActionListener(e -> {
-      new Thread(() -> {
+      new Thread(() -> {    
+        textArea.setText("");
         procurarEPlotarArquivos(textArea);
       })
         .start();
@@ -114,9 +128,49 @@ public class PDFPageCounter {
       diretorio.setText("Selecione um diretório");
     });
 
+
+
     numberComboBox.addActionListener(e ->
       diasPorSemana = (int) numberComboBox.getSelectedItem()
     );
+
+    totalDeSemanas.getDocument().addDocumentListener(new DocumentListener() {
+      @Override
+      public void removeUpdate(final DocumentEvent paramDocumentEvent) {
+          if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+            totalDeSemanasInt = 0;
+            buttonProcurar.setEnabled(false);
+          } else {
+          totalDeSemanasInt = Integer.parseInt(totalDeSemanas.getText());
+          buttonProcurar.setEnabled(true);
+          }
+      }
+  
+      @Override
+      public void insertUpdate(final DocumentEvent paramDocumentEvent) {
+         if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+            totalDeSemanasInt = 0;
+            buttonProcurar.setEnabled(false);
+          } else {
+          totalDeSemanasInt = Integer.parseInt(totalDeSemanas.getText());
+          buttonProcurar.setEnabled(true);
+          }
+      }
+  
+      @Override
+      public void changedUpdate(final DocumentEvent paramDocumentEvent) {
+         if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+            totalDeSemanasInt = 0;
+            buttonProcurar.setEnabled(false);
+          } else {
+          totalDeSemanasInt = Integer.parseInt(totalDeSemanas.getText());
+          buttonProcurar.setEnabled(true);
+          }
+      }
+  });
+    
+     
+
 
     frame.setVisible(true);
   }
@@ -144,13 +198,12 @@ public class PDFPageCounter {
     SwingUtilities.invokeLater(() ->
       textArea.append("Total de paginas " + paginas + "\n")
     );
-    BigDecimal paginasPorDiaDecimal = new BigDecimal(paginas / diasPorSemana);
-    int paginasPorDia = paginasPorDiaDecimal
-      .setScale(0, RoundingMode.CEILING)
-      .intValue();
 
-    BigDecimal totalDeDiasDecimal = new BigDecimal(paginas / paginasPorDia);
-    int totalDeDias = totalDeDiasDecimal
+    int diasDeLeitura = (totalDeSemanasInt * diasPorSemana);
+    BigDecimal paginasPorDiaDecimal = new BigDecimal(paginas / diasDeLeitura);
+
+
+    int paginasPorDia = paginasPorDiaDecimal
       .setScale(0, RoundingMode.CEILING)
       .intValue();
 
@@ -161,14 +214,21 @@ public class PDFPageCounter {
         " paginas por dia, considerados " +
         diasPorSemana +
         " dias por semana, em um total de " +
-        totalDeDias +
+        diasDeLeitura +
         " dias.\n"
       )
     );
-    criarPlanoDeLeitura(pdfsDeEstudo, paginasPorDia, textArea); // 5 páginas por dia
+    
+    //System.out.println("diasDeLeitura " + diasDeLeitura);
+    //System.out.println("paginas " + paginas);
+    //System.out.println("paginasPorDia " + paginasPorDia);
+    criarPlanoDeLeitura(pdfsDeEstudo, paginasPorDia, textArea);
+    pdfsDeEstudo.clear();
   }
 
   private static void processFolder(File folder, JTextArea textArea) {
+    arquivosTotais = 0;
+    paginas = 0.0;
     File[] listOfFiles = folder.listFiles();
     if (listOfFiles != null) {
       for (File file : listOfFiles) {
@@ -194,7 +254,8 @@ public class PDFPageCounter {
         textArea.append(
           file.getAbsolutePath() + " tem " + pageCount + " paginas.\n"
         );
-        //System.out.println( file.getAbsolutePath() + " tem " + pageCount + " paginas.\n");
+        System.out.println( file.getAbsolutePath() + " tem " + pageCount + " paginas.\n");
+        
         pdfsDeEstudo.add(new PDFDeEstudo(file.getAbsolutePath(), pageCount));
       });
     } catch (IOException e) {
@@ -233,7 +294,7 @@ public class PDFPageCounter {
         );
 
         if (diaEmCurso != dia[0]) {
-          String s = "\n\nDia " + dia[0];
+          String s = "\nDia " + dia[0];
           System.out.printf(s);
           SwingUtilities.invokeLater(() ->
             textArea.append(s));
