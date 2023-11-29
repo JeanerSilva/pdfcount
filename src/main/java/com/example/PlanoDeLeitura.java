@@ -50,7 +50,7 @@ public class PlanoDeLeitura {
 
         System.out.printf(
           " %s páginas de %d a %d ",
-          pdfAtual.getNomeDoArquivo(),
+          pdfAtual.getArquivo(),
           paginaAtualNoPDF,
           paginaAtualNoPDF + paginasParaLerHoje - 1
         );

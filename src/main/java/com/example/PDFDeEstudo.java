@@ -19,11 +19,11 @@ public class PDFDeEstudo {
         return arquivo;
     }
 
-    public String getNomeDoArquivo() {
-        int ultimoIndice = arquivo.lastIndexOf("\\");        
-        String nomeDoArquivo = ultimoIndice >= 0 ? arquivo.substring(ultimoIndice + 1) : arquivo;
-        return nomeDoArquivo;
-    }
+    //public String getNomeDoArquivo() {
+    //    int ultimoIndice = arquivo.lastIndexOf("\\");        
+    //    String nomeDoArquivo = ultimoIndice >= 0 ? arquivo.substring(ultimoIndice + 1) : arquivo;
+    //    return nomeDoArquivo;
+   // }
 
     // Setter para o arquivo
     public void setArquivo(String arquivo) {

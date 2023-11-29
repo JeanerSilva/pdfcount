@@ -2,6 +2,7 @@ package com.example;
 
 import java.awt.*;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -12,16 +13,20 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 
 public class PDFPageCounter {
 
   public static Double paginas = 0.0;
   public static Integer arquivosTotais = 0;
-  public static Integer totalDeSemanasInt = 13;
+  public static Integer totalDeSemanasInt = 20;
   private static File selectedDirectory = null;
-  private static int diasPorSemana = 7;
+  private static int diasPorSemana = 6;
   private static List<PDFDeEstudo> pdfsDeEstudo = new ArrayList<>();
+  private static List<PDFParaCSV> pdfsParaCSV = new ArrayList<>();
 
   public static void main(String[] args) {
     SwingUtilities.invokeLater(() -> {
@@ -75,6 +80,7 @@ public class PDFPageCounter {
     buttonLimpar.setBounds(30, 170, 150, 50);
 
     Integer[] numbers = { 1, 2, 3, 4, 5, 6, 7 };
+    
     JComboBox<Integer> numberComboBox = new JComboBox<>(numbers);
     JLabel diasPorSemanaLabel = new JLabel("Dias de estudo por semana");
     numberComboBox.setBounds(30, 260, 50, 20);
@@ -137,7 +143,7 @@ public class PDFPageCounter {
     totalDeSemanas.getDocument().addDocumentListener(new DocumentListener() {
       @Override
       public void removeUpdate(final DocumentEvent paramDocumentEvent) {
-          if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+          if (totalDeSemanas.getText().isEmpty()) {
             totalDeSemanasInt = 0;
             buttonProcurar.setEnabled(false);
           } else {
@@ -148,7 +154,7 @@ public class PDFPageCounter {
   
       @Override
       public void insertUpdate(final DocumentEvent paramDocumentEvent) {
-         if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+         if (totalDeSemanas.getText().isEmpty()) {
             totalDeSemanasInt = 0;
             buttonProcurar.setEnabled(false);
           } else {
@@ -159,7 +165,7 @@ public class PDFPageCounter {
   
       @Override
       public void changedUpdate(final DocumentEvent paramDocumentEvent) {
-         if (totalDeSemanas.getText().isBlank() || totalDeSemanas.getText().isEmpty()) {
+         if (totalDeSemanas.getText().isEmpty()) {
             totalDeSemanasInt = 0;
             buttonProcurar.setEnabled(false);
           } else {
@@ -187,20 +193,19 @@ public class PDFPageCounter {
   }
 
   private static void procurarEPlotarArquivos(JTextArea textArea) {
-    System.out.println(
-      "iniciando busca em " + selectedDirectory.getAbsolutePath()
-    );
     File rootFolder = new File(selectedDirectory.getAbsolutePath());
+    arquivosTotais = 0;
+    paginas = 0.0;
     processFolder(rootFolder, textArea);
     SwingUtilities.invokeLater(() ->
-      textArea.append("\n\nTotal de arquivos " + arquivosTotais + "\n")
+      textArea.append("\n\nTotal de arquivos: " + arquivosTotais + "\n")
     );
     SwingUtilities.invokeLater(() ->
-      textArea.append("Total de paginas " + paginas + "\n")
+      textArea.append("Total de paginas: " + paginas + "\n")
     );
 
     int diasDeLeitura = (totalDeSemanasInt * diasPorSemana);
-    BigDecimal paginasPorDiaDecimal = new BigDecimal(paginas / diasDeLeitura);
+    BigDecimal paginasPorDiaDecimal = BigDecimal.valueOf(paginas / diasDeLeitura);
 
 
     int paginasPorDia = paginasPorDiaDecimal
@@ -219,16 +224,42 @@ public class PDFPageCounter {
       )
     );
     
-    //System.out.println("diasDeLeitura " + diasDeLeitura);
-    //System.out.println("paginas " + paginas);
-    //System.out.println("paginasPorDia " + paginasPorDia);
     criarPlanoDeLeitura(pdfsDeEstudo, paginasPorDia, textArea);
     pdfsDeEstudo.clear();
+
+    int ultimoIndice = selectedDirectory.getAbsolutePath().lastIndexOf("\\");   
+    System.out.println("ultimoindice " + ultimoIndice);    
+    if (ultimoIndice == -1) {
+        ultimoIndice = selectedDirectory.getAbsolutePath().lastIndexOf("/");       
+    } 
+    String nomeDoArquivo = ultimoIndice >= 0 ? selectedDirectory.getAbsolutePath().substring(ultimoIndice + 1) : selectedDirectory.getAbsolutePath();
+    System.out.println("nomedoarquivo " + nomeDoArquivo);
+    String barra = ultimoIndice != -1 ? "/" : "\\";
+    String csvFilePath =  selectedDirectory + barra + nomeDoArquivo + ".csv";
+
+    exportToCSV(pdfsParaCSV, csvFilePath);
+    System.out.println("csvFilePath " + csvFilePath);
+
   }
 
+  public static void exportToCSV(List<PDFParaCSV> pdfsParaCSV2, String csvFilePath) {
+        try (FileWriter fileWriter = new FileWriter(csvFilePath);
+             CSVPrinter csvPrinter = new CSVPrinter(fileWriter, CSVFormat.DEFAULT)) {
+            
+            csvPrinter.printRecord("Dia", "Arquivo", "Paginas");
+
+            for (PDFParaCSV pdf : pdfsParaCSV2) {
+                csvPrinter.printRecord(pdf.getDia(), pdf.getArquivo(), pdf.getPaginas());
+            }
+            
+            System.out.println("Exportação para CSV concluída com sucesso!");
+        } catch (IOException e) {
+            System.err.println("Erro ao exportar para CSV: " + e.getMessage());
+        }
+    }
+
   private static void processFolder(File folder, JTextArea textArea) {
-    arquivosTotais = 0;
-    paginas = 0.0;
+
     File[] listOfFiles = folder.listFiles();
     if (listOfFiles != null) {
       for (File file : listOfFiles) {
@@ -237,7 +268,7 @@ public class PDFPageCounter {
         } else if (file.isDirectory()) {
           //System.out.println("Pasta " + file.getName() + "\n\n");
           SwingUtilities.invokeLater(() ->
-            textArea.append("\n\n Pasta " + file.getName() + "\n\n")
+            textArea.append("\n\n Pasta " + file.getName() + ". Arquivos totais: " + arquivosTotais + ". Páginas totais: " + paginas + "\n\n")
           );
           processFolder(file, textArea); // Chamada recursiva para subdiretórios
         }
@@ -282,6 +313,7 @@ public class PDFPageCounter {
 
     while (indicePDFAtual[0] < pdfs.size()) {
       int paginasLidasNoDia = 0;
+      String arquivo = "";
       while (
         paginasLidasNoDia < paginasPorDia && indicePDFAtual[0] < pdfs.size()
       ) {
@@ -293,34 +325,42 @@ public class PDFPageCounter {
           paginasRestantesNoPDF
         );
 
-        if (diaEmCurso != dia[0]) {
-          String s = "\nDia " + dia[0];
-          System.out.printf(s);
+        
+        String paginas = "";
+        String diaDeLeitura = String.valueOf(dia[0]);
+        
+        if (diaEmCurso != dia[0]) {               
+            String s = "\nDia " + dia[0] ;
+            arquivo = " " + pdfAtual.getArquivo();    
+          //System.out.printf(s);
           SwingUtilities.invokeLater(() ->
             textArea.append(s));
           diaEmCurso = dia[0];
         } else {
-          System.out.printf(" e");
+          arquivo = " " + pdfAtual.getArquivo();    
+          //System.out.printf(" e");
           SwingUtilities.invokeLater(() -> textArea.append(" e"));
         }
         String s1 =  " " +
-            pdfAtual.getNomeDoArquivo() +
+            pdfAtual.getArquivo() +
             " paginas de " +
             paginaAtualNoPDF[0] +
             " a " +
             (paginaAtualNoPDF[0] + paginasParaLerHoje - 1);
-        System.out.printf( s1
-        );
+        paginas += paginaAtualNoPDF[0] + " a " + (paginaAtualNoPDF[0] + paginasParaLerHoje - 1);
+        //System.out.printf(s1);
 
         SwingUtilities.invokeLater(() ->
           textArea.append(s1)
         );
 
         if (diaEmCurso != dia[0]) {
-          System.out.printf("\n");
+          //System.out.printf("\n");
           SwingUtilities.invokeLater(() -> textArea.append("\n"));
+          arquivo = "";
         }
-
+        System.out.println("dia: " + diaDeLeitura + ". arquivo: " + arquivo  + ". página: " + paginas);
+        pdfsParaCSV.add(new PDFParaCSV(diaDeLeitura, arquivo, paginas));
         paginasLidasNoDia += paginasParaLerHoje;
         paginaAtualNoPDF[0] += paginasParaLerHoje;
 
@@ -329,6 +369,7 @@ public class PDFPageCounter {
           indicePDFAtual[0]++; // Passar para o próximo PDF
           paginaAtualNoPDF[0] = 1; // Começar do início do próximo PDF
         }
+        
       }
       dia[0]++; // Passar para o próximo dia
     }
