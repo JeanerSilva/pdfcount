@@ -17,7 +17,7 @@ public class PlanoDeLeitura {
     // Plano de leitura
     criarPlanoDeLeitura(pdfs, 30); // 5 páginas por dia
   }
-
+///linha adicionada
   public static void criarPlanoDeLeitura(
     List<PDFDeEstudo> pdfs,
     int paginasPorDia
